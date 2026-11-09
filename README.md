@@ -161,47 +161,6 @@ POSTGRES_PORT=5432
 POSTGRES_DB=balaji_fleet_db
 ```
 
----
-
-## 6. Live API Integrations (Surepass & Masters India)
-
-The system supports two live government & compliance API providers:
-
-### A. Surepass Parivahan API (Active Default)
-Directly integrated with Balaji Transports' live external gateway:
-* **Challan Endpoint**: `https://external.balajitransports.in/api/SurepassvehicleRcdetails/GetVehicleRCChallanData`
-* **RC Details Endpoint**: `https://external.balajitransports.in/api/SurepassvehicleRcdetails/GetVehicleRcDetails`
-
-#### Configuration in `.env`
-```ini
-CHALLAN_DATA_PROVIDER=surepass
-SUREPASS_CHALLAN_API_URL=https://external.balajitransports.in/api/SurepassvehicleRcdetails/GetVehicleRCChallanData
-SUREPASS_RC_API_URL=https://external.balajitransports.in/api/SurepassvehicleRcdetails/GetVehicleRcDetails
-```
-
-#### Syncing Live Challans via CLI
-```powershell
-# Sync top 15 test vehicles with the most challans (AP16TE6293, KA19AA8275, KA06AC0186, etc.)
-flask sync-surepass
-
-# Sync all active fleet vehicles against Surepass
-flask sync-surepass --all
-```
-
-### B. Masters India Vehicle e-Challan API
-* **API Endpoint**: `https://api-platform.mastersindia.co/api/v2/sbt/ECHALLAN/`
-* **Auth Endpoint**: `https://api-platform.mastersindia.co/api/v2/token-auth/`
-* **Format**: `POST` with `{"vehiclenumber": "MH12AB1234"}` and header `Authorization: JWT <token>`
-
-#### Configuration in `.env`
-```ini
-CHALLAN_DATA_PROVIDER=masters_india
-MASTERS_INDIA_API_TOKEN=your_jwt_access_token_here
-# Or:
-# MASTERS_INDIA_USERNAME=your_username@company.com
-# MASTERS_INDIA_PASSWORD=your_password
-```
-
 ### Running Fleet Scans
 1. **From the Web App**:
    * Navigate to **Fleet Vehicles** (`/vehicles`).
