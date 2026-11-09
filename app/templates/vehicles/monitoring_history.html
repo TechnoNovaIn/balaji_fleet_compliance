@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Monitoring Checks{% endblock %}
+{% block page_title %}Challan Monitoring History{% endblock %}
+{% block page_subtitle %}Audit log of vehicle compliance checks, data sources, and discovered violations{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h6 class="fw-bold text-dark mb-0">Vehicle Checks Log</h6>
+            <small class="text-muted">Showing {{ logs | length }} inspection record(s)</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('vehicles.monitoring_history', today='1') }}" class="btn btn-sm {% if filter_today %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-calendar-check me-1"></i> Checked Today
+            </a>
+            <a href="{{ url_for('vehicles.monitoring_history', today='0') }}" class="btn btn-sm {% if not filter_today %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                All History
+            </a>
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Dashboard
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light fs-8 text-uppercase text-secondary">
+                    <tr>
+                        <th class="ps-3">Vehicle</th>
+                        <th>Check Timestamp</th>
+                        <th>Data Source / Provider</th>
+                        <th>Status</th>
+                        <th>Challans Found</th>
+                        <th class="pe-3 text-end">Details / Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if logs %}
+                        {% for log in logs %}
+                            <tr>
+                                <td class="ps-3">
+                                    {% if log.vehicle %}
+                                        <span class="fw-bold font-monospace text-dark">{{ log.vehicle.formatted_registration }}</span>
+                                        <br>
+                                        <small class="text-muted">{{ log.vehicle.vehicle_type }} &bull; {{ log.vehicle.make_model or '' }}</small>
+                                    {% else %}
+                                        <span class="text-muted">Batch Fleet Check</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="small text-dark">{{ log.check_start_time.strftime('%d-%b-%Y %H:%M:%S') if log.check_start_time else '-' }} UTC</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ log.data_source }}</span>
+                                </td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-check-circle me-1"></i> Success
+                                        </span>
+                                    {% elif log.status == 'failed' %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                            <i class="bi bi-x-circle me-1"></i> Failed
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border">
+                                            {{ log.status | title }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.challans_found > 0 %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis fw-bold">
+                                            {{ log.challans_found }} Challan(s)
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">0 new</span>
+                                    {% endif %}
+                                </td>
+                                <td class="pe-3 text-end text-muted small">
+                                    {{ log.error_details or 'Completed successfully' }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar2-check fs-1 text-secondary d-block mb-2"></i>
+                                No monitoring check records found for the selected time window.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

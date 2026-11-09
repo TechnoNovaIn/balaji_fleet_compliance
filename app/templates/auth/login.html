@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center min-vh-75 py-4">
+    <div class="col-11 col-sm-9 col-md-7 col-lg-5 col-xl-4">
+        <!-- Login Card -->
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+            <!-- Card Header Branding -->
+            <div class="bg-navy p-4 text-center text-white position-relative">
+                <div class="brand-badge-circle mx-auto mb-3 bg-warning text-dark shadow-sm">
+                    <i class="bi bi-shield-lock-fill fs-2"></i>
+                </div>
+                <h4 class="fw-bold mb-1 tracking-tight">Balaji Transports</h4>
+                <div class="text-white-50 small text-uppercase tracking-wider">Fleet Compliance Portal</div>
+            </div>
+
+            <!-- Card Body Form -->
+            <div class="card-body p-4 p-md-5">
+                <div class="mb-4 text-center">
+                    <h5 class="fw-bold text-dark mb-1">Administrator Sign In</h5>
+                    <p class="text-muted small">Enter your credentials to access the fleet compliance dashboard.</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
+                    <!-- CSRF Protection -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Username / Email Field -->
+                    <div class="mb-3">
+                        <label for="username" class="form-label fw-semibold text-secondary small">Username or Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 text-muted">
+                                <i class="bi bi-person-fill"></i>
+                            </span>
+                            <input type="text"
+                                   class="form-control bg-light border-start-0 ps-0"
+                                   id="username"
+                                   name="username"
+                                   value="{{ username or '' }}"
+                                   placeholder="e.g. admin or admin@balajitransports.com"
+                                   required
+                                   autocomplete="username"
+                                   autofocus>
+                        </div>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="mb-3">
+                        <label for="password" class="form-label fw-semibold text-secondary small">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 text-muted">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                            <input type="password"
+                                   class="form-control bg-light border-start-0 ps-0"
+                                   id="password"
+                                   name="password"
+                                   placeholder="••••••••••••"
+                                   required
+                                   autocomplete="current-password">
+                        </div>
+                    </div>
+
+                    <!-- Remember Me Option -->
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember" name="remember" value="1">
+                        <label class="form-check-label text-muted small" for="remember">Keep me logged in on this device</label>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-navy py-2 fw-semibold text-white shadow-sm">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Sign In to Fleet Portal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Compliance Security Footer -->
+        <div class="text-center text-muted small mt-3">
+            <i class="bi bi-shield-check text-success"></i> Strict 256-bit encrypted session &bull; Compliance audit logging
+        </div>
+    </div>
+</div>
+{% endblock %}

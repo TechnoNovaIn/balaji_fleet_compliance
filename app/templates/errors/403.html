@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied{% endblock %}
+{% block page_title %}403 - Forbidden{% endblock %}
+{% block page_subtitle %}You do not have permission to access this resource{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 col-lg-5 text-center">
+        <div class="bg-danger-subtle text-danger rounded-circle p-4 d-inline-flex mb-3">
+            <i class="bi bi-shield-slash fs-1"></i>
+        </div>
+        <h3 class="fw-bold text-dark">Access Denied</h3>
+        <p class="text-muted">
+            Your current user role does not have authorization to view or modify this resource.
+            Role-based permissions are enforced strictly on the server side for compliance.
+        </p>
+        <div class="mt-3">
+            <a href="{{ url_for('challans.index') }}" class="btn btn-navy px-4">
+                <i class="bi bi-arrow-left me-1"></i> Return to Challans
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

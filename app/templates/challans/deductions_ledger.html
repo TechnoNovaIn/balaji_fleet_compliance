@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Driver Salary Deductions Ledger{% endblock %}
+{% block page_title %}Driver Salary Deductions Ledger{% endblock %}
+{% block page_subtitle %}Track unrecovered traffic penalties to deduct from driver salaries or trip settlements{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h6 class="fw-bold text-dark mb-0">Driver Penalties Summary</h6>
+            <small class="text-muted">Total: <strong>{{ drivers_summary | length }}</strong> driver(s) with recorded violations</small>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Search Driver Form -->
+            <form method="GET" action="{{ url_for('challans.deductions_ledger') }}" class="d-flex align-items-center gap-2">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="driver" class="form-control" placeholder="Search Driver Name..." value="{{ search_driver }}">
+                    <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
+            <a href="{{ url_for('challans.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to All Challans
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light fs-8 text-uppercase text-secondary">
+                    <tr>
+                        <th class="ps-3">Driver Name</th>
+                        <th>Mobile</th>
+                        <th>Violations Count</th>
+                        <th>Total Penalties</th>
+                        <th>Pending Salary Deduction</th>
+                        <th>Recovered Amount</th>
+                        <th class="pe-3 text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if drivers_summary %}
+                        {% for d in drivers_summary %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark fs-6">
+                                        <i class="bi bi-person-circle me-1 text-primary"></i>{{ d.driver_name }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="text-secondary small">{{ d.driver_mobile }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ d.total_violations }} violation(s)</span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-dark">{{ d.total_penalties | inr }}</span>
+                                </td>
+                                <td>
+                                    {% if d.pending_deductions > 0 %}
+                                        <span class="fw-bold text-danger fs-6">{{ d.pending_deductions | inr }}</span>
+                                        <span class="badge bg-danger-subtle text-danger ms-1">Cut from pay</span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success">Fully Cleared</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="text-success fw-semibold">{{ d.deducted_amount | inr }}</span>
+                                </td>
+                                <td class="pe-3 text-end">
+                                    <a href="{{ url_for('challans.index', search=d.driver_name) }}" class="btn btn-outline-primary btn-sm py-1 px-2">
+                                        <i class="bi bi-list-check me-1"></i> View Challans
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-check-circle fs-1 text-success d-block mb-2"></i>
+                                No driver penalty deductions found. All drivers are clear or no drivers tagged yet.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

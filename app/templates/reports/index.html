@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Fleet Reports{% endblock %}
+{% block page_title %}Compliance & Financial Reports{% endblock %}
+{% block page_subtitle %}Audit summaries, vehicle compliance reports, and Excel/CSV exports{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-body p-4">
+                <div class="icon-shape bg-primary-subtle text-primary rounded-3 p-3 mb-3 d-inline-block">
+                    <i class="bi bi-file-earmark-spreadsheet fs-3"></i>
+                </div>
+                <h5 class="fw-bold text-dark">Vehicle Compliance Report</h5>
+                <p class="text-muted small">Summary of all registered vehicles with active violation count and total penalty balance.</p>
+                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-body p-4">
+                <div class="icon-shape bg-danger-subtle text-danger rounded-3 p-3 mb-3 d-inline-block">
+                    <i class="bi bi-exclamation-octagon fs-3"></i>
+                </div>
+                <h5 class="fw-bold text-dark">Outstanding Challan Report</h5>
+                <p class="text-muted small">Detailed list of unpaid and disputed challans categorized by state authority and branch.</p>
+                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-body p-4">
+                <div class="icon-shape bg-success-subtle text-success rounded-3 p-3 mb-3 d-inline-block">
+                    <i class="bi bi-receipt-cutoff fs-3"></i>
+                </div>
+                <h5 class="fw-bold text-dark">Payment Audit Report</h5>
+                <p class="text-muted small">Complete ledger of recorded settlements, verification approvals, and payment receipts.</p>
+                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
