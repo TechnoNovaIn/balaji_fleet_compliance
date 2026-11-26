@@ -67,13 +67,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('payments.index') }}" class="nav-link text-white-50 {% if request.blueprint == 'payments' %}active{% endif %}">
-                                <i class="bi bi-journal-text me-2"></i> Records
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a href="{{ url_for('reports.index') }}" class="nav-link text-white-50 {% if request.blueprint == 'reports' %}active{% endif %}">
-                                <i class="bi bi-file-earmark-bar-graph me-2"></i> Reports
+                                <i class="bi bi-file-earmark-excel me-2"></i> Excel Reports
                             </a>
                         </li>
                     </ul>
@@ -115,13 +110,15 @@
                     </div>
                     {% if current_user.is_authenticated %}
                     <div class="d-flex align-items-center gap-3">
-                        <!-- Simulate Roadside Live Challan Trigger -->
+                        {% if config.DEBUG %}
+                        <!-- Simulate Roadside Live Challan Trigger (Debug Only) -->
                         <form action="{{ url_for('challans.simulate_live_alert') }}" method="POST" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold shadow-sm" title="Simulate a roadside speed camera detecting a truck right now">
                                 <i class="bi bi-broadcast me-1"></i> Test Live Roadside Alert
                             </button>
                         </form>
+                        {% endif %}
 
                         <!-- Live Notification Bell Dropdown -->
                         <div class="dropdown">

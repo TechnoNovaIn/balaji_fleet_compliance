@@ -16,7 +16,7 @@ def is_safe_redirect_url(target: str) -> bool:
         return False
     ref_url = urlsplit(request.host_url)
     test_url = urlsplit(target)
-    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc or not test_url.netloc
+    return test_url.scheme in ("", "http", "https") and test_url.netloc in ("", ref_url.netloc)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])

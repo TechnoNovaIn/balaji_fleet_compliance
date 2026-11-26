@@ -11,9 +11,16 @@ def format_inr(value) -> str:
     """Format numeric values as Indian Rupee currency (e.g., ₹1,23,456.00)."""
     try:
         val = float(value or 0.0)
-        # Indian number formatting: thousands, then lakhs, then crores
-        formatted = f"{val:,.2f}"
-        return f"₹{formatted}"
+        sign = "-" if val < 0 else ""
+        int_part, dec_part = f"{abs(val):.2f}".split(".")
+        if len(int_part) > 3:
+            last3 = int_part[-3:]
+            rest = int_part[:-3]
+            groups = [rest[max(i - 2, 0):i] for i in range(len(rest), 0, -2)][::-1]
+            grouped = ",".join(groups) + "," + last3
+        else:
+            grouped = int_part
+        return f"{sign}₹{grouped}.{dec_part}"
     except (ValueError, TypeError):
         return f"₹{value}"
 
@@ -41,13 +48,17 @@ def create_app(config_name=None) -> Flask:
 
     @app.context_processor
     def inject_global_template_vars():
+        from flask_login import current_user
         from app.models.challan import Challan
-        try:
-            unack_challans = Challan.query.filter_by(is_acknowledged=False).order_by(Challan.violation_date.desc()).limit(5).all()
-            total_unack = Challan.query.filter_by(is_acknowledged=False).count()
-        except Exception:
-            unack_challans = []
-            total_unack = 0
+        unack_challans = []
+        total_unack = 0
+        if current_user.is_authenticated:
+            try:
+                unack_challans = Challan.query.filter_by(is_acknowledged=False).order_by(Challan.violation_date.desc()).limit(5).all()
+                total_unack = Challan.query.filter_by(is_acknowledged=False).count()
+            except Exception:
+                unack_challans = []
+                total_unack = 0
 
         return {
             "current_year": datetime.now(timezone.utc).year,

@@ -1,46 +1,139 @@
 {% extends "base.html" %}
 
-{% block title %}Fleet Reports{% endblock %}
-{% block page_title %}Compliance & Financial Reports{% endblock %}
-{% block page_subtitle %}Audit summaries, vehicle compliance reports, and Excel/CSV exports{% endblock %}
+{% block title %}Excel Reports{% endblock %}
+{% block page_title %}Excel Reports & Multi-Person Checklist{% endblock %}
+{% block page_subtitle %}Generate clean, shareable Excel (.xlsx) workbooks so multiple team members can review and verify challans together{% endblock %}
 
 {% block content %}
+<!-- Custom Excel Report Builder -->
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold text-dark mb-0">
+            <i class="bi bi-funnel text-primary me-2"></i>Custom Excel Checklist Builder
+        </h6>
+        <small class="text-muted">Filter the challans you want to include, preview totals, and download a formatted Excel workbook.</small>
+    </div>
+    <div class="card-body pt-0">
+        <form method="GET" action="{{ url_for('reports.index') }}" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-secondary">Vehicle</label>
+                <select name="vehicle_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All Vehicles</option>
+                    {% for v in vehicles %}
+                        <option value="{{ v.id }}" {% if selected_vehicle_id == v.id %}selected{% endif %}>
+                            {{ v.formatted_registration }} ({{ v.make_model }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-secondary">Payment Status</label>
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="unpaid" {% if selected_status == 'unpaid' %}selected{% endif %}>Pending / Unpaid</option>
+                    <option value="paid" {% if selected_status == 'paid' %}selected{% endif %}>Paid / Settled</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-secondary">Amount & Order</label>
+                <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Highest Challan Amount First</option>
+                    <option value="high_5000" {% if selected_sort == 'high_5000' %}selected{% endif %}>High Amount (₹5,000+)</option>
+                    <option value="high_10000" {% if selected_sort == 'high_10000' %}selected{% endif %}>High Amount (₹10,000+)</option>
+                    <option value="" {% if selected_sort == '' %}selected{% endif %}>Latest Date First</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-secondary">From Date</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" onchange="this.form.submit()">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-secondary">To Date</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" onchange="this.form.submit()">
+            </div>
+        </form>
+
+        <!-- Live Preview Summary + Download Button -->
+        <div class="bg-light rounded-3 p-3 mt-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="d-flex flex-wrap gap-4">
+                <div>
+                    <small class="text-muted d-block">Matching Challans</small>
+                    <span class="fw-bold fs-5 text-dark">{{ matching_count }}</span>
+                    <small class="text-danger">({{ unpaid_count }} unpaid)</small>
+                </div>
+                <div>
+                    <small class="text-muted d-block">Total Fine Amount</small>
+                    <span class="fw-bold fs-5 text-dark">{{ total_fine | inr }}</span>
+                </div>
+                <div>
+                    <small class="text-muted d-block">Paid Amount</small>
+                    <span class="fw-bold fs-5 text-success">{{ total_paid | inr }}</span>
+                </div>
+                <div>
+                    <small class="text-muted d-block">Balance Due</small>
+                    <span class="fw-bold fs-5 text-danger">{{ total_balance | inr }}</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('reports.export_challans_excel', vehicle_id=selected_vehicle_id or '', status=selected_status, sort=selected_sort, date_from=date_from, date_to=date_to) }}"
+                   class="btn btn-success fw-semibold shadow-sm">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Download Excel Checklist (.xlsx)
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- One-Click Excel Report Cards -->
 <div class="row g-4">
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-3 h-100">
-            <div class="card-body p-4">
-                <div class="icon-shape bg-primary-subtle text-primary rounded-3 p-3 mb-3 d-inline-block">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="icon-shape bg-success-subtle text-success rounded-3 p-3 mb-3 d-inline-block align-self-start">
                     <i class="bi bi-file-earmark-spreadsheet fs-3"></i>
                 </div>
-                <h5 class="fw-bold text-dark">Vehicle Compliance Report</h5>
-                <p class="text-muted small">Summary of all registered vehicles with active violation count and total penalty balance.</p>
-                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+                <h5 class="fw-bold text-dark">Complete Challan & Payment Checklist</h5>
+                <p class="text-muted small flex-grow-1">
+                    Multi-sheet Excel workbook with <strong>Summary</strong>, <strong>Challan Checklist</strong> (with
+                    <em>Checked By</em> &amp; <em>Remarks</em> columns for team review), and <strong>Payment Settlements</strong>.
+                </p>
+                <a href="{{ url_for('reports.export_challans_excel', sort='amount_desc') }}" class="btn btn-outline-success btn-sm fw-semibold mt-2">
+                    <i class="bi bi-download me-1"></i> Download Full Checklist (.xlsx)
+                </a>
             </div>
         </div>
     </div>
 
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-3 h-100">
-            <div class="card-body p-4">
-                <div class="icon-shape bg-danger-subtle text-danger rounded-3 p-3 mb-3 d-inline-block">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="icon-shape bg-danger-subtle text-danger rounded-3 p-3 mb-3 d-inline-block align-self-start">
                     <i class="bi bi-exclamation-octagon fs-3"></i>
                 </div>
-                <h5 class="fw-bold text-dark">Outstanding Challan Report</h5>
-                <p class="text-muted small">Detailed list of unpaid and disputed challans categorized by state authority and branch.</p>
-                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+                <h5 class="fw-bold text-dark">High-Value &amp; Unpaid Challans</h5>
+                <p class="text-muted small flex-grow-1">
+                    Unpaid and partially paid challans sorted from the <strong>highest fine amount</strong> down, ready for priority clearance.
+                </p>
+                <a href="{{ url_for('reports.export_challans_excel', status='unpaid', sort='amount_desc') }}" class="btn btn-outline-danger btn-sm fw-semibold mt-2">
+                    <i class="bi bi-download me-1"></i> Download Unpaid Priority (.xlsx)
+                </a>
             </div>
         </div>
     </div>
 
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-3 h-100">
-            <div class="card-body p-4">
-                <div class="icon-shape bg-success-subtle text-success rounded-3 p-3 mb-3 d-inline-block">
-                    <i class="bi bi-receipt-cutoff fs-3"></i>
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="icon-shape bg-primary-subtle text-primary rounded-3 p-3 mb-3 d-inline-block align-self-start">
+                    <i class="bi bi-truck fs-3"></i>
                 </div>
-                <h5 class="fw-bold text-dark">Payment Audit Report</h5>
-                <p class="text-muted small">Complete ledger of recorded settlements, verification approvals, and payment receipts.</p>
-                <span class="badge bg-light text-secondary border">Excel & CSV Export (Phase 4)</span>
+                <h5 class="fw-bold text-dark">Vehicle-Wise Compliance Report</h5>
+                <p class="text-muted small flex-grow-1">
+                    Summary of all registered vehicles with total challans, unpaid count, total outstanding balance, and sign-off column.
+                </p>
+                <a href="{{ url_for('reports.export_vehicles_excel') }}" class="btn btn-outline-primary btn-sm fw-semibold mt-2">
+                    <i class="bi bi-download me-1"></i> Download Vehicle Summary (.xlsx)
+                </a>
             </div>
         </div>
     </div>

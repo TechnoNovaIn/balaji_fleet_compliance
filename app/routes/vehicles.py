@@ -46,7 +46,6 @@ def scan_fleet():
             limit = 15
 
     if api_token:
-        os.environ["MASTERS_INDIA_API_TOKEN"] = api_token
         provider = MastersIndiaChallanProvider(api_token=api_token, allow_sandbox=True)
     else:
         provider = get_default_challan_provider()
@@ -77,6 +76,7 @@ def index():
     status_filter = request.args.get("status", "").strip()
     type_filter = request.args.get("type", "").strip()
     search_query = request.args.get("search", "").strip()
+    page = request.args.get("page", 1, type=int)
 
     query = Vehicle.query
 
@@ -99,13 +99,15 @@ def index():
             )
         )
 
-    vehicles = query.order_by(Vehicle.created_at.desc()).all()
+    pagination = query.order_by(Vehicle.created_at.desc()).paginate(page=page, per_page=50, error_out=False)
+    vehicles = pagination.items
     total_count = Vehicle.query.count()
     active_count = Vehicle.query.filter_by(is_active=True).count()
 
     return render_template(
         "vehicles/index.html",
         vehicles=vehicles,
+        pagination=pagination,
         total_count=total_count,
         active_count=active_count,
         selected_status=status_filter,

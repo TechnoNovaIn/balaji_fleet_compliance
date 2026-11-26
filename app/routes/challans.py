@@ -1,6 +1,6 @@
 """Challans blueprint handling traffic violation notices, driver tagging, and salary deductions."""
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from app.extensions import db
@@ -9,6 +9,7 @@ from app.models.vehicle import Vehicle
 from app.models.monitoring_log import MonitoringLog
 from app.models.audit_log import AuditLog
 from app.services.challan_monitor import ChallanMonitorService
+from app.services.challan_queries import build_filtered_challans_query
 
 challans_bp = Blueprint("challans", __name__, url_prefix="/challans")
 
@@ -20,36 +21,20 @@ def index():
     status_filter = request.args.get("status", "").strip()
     vehicle_filter = request.args.get("vehicle_id", type=int)
     deduction_filter = request.args.get("deduction", "").strip()
+    sort_by = request.args.get("sort", "").strip()
     search_query = request.args.get("search", "").strip()
+    page = request.args.get("page", 1, type=int)
 
-    query = Challan.query.join(Vehicle)
+    query = build_filtered_challans_query(
+        vehicle_id=vehicle_filter,
+        status=status_filter,
+        deduction=deduction_filter,
+        sort_by=sort_by,
+        search_query=search_query,
+    )
 
-    if vehicle_filter:
-        query = query.filter(Challan.vehicle_id == vehicle_filter)
-
-    if status_filter == "unpaid":
-        query = query.filter(Challan.payment_status.in_([Challan.PAYMENT_UNPAID, Challan.PAYMENT_PARTIALLY_PAID]))
-    elif status_filter == "paid":
-        query = query.filter(Challan.payment_status == Challan.PAYMENT_PAID)
-
-    if deduction_filter:
-        query = query.filter(Challan.deduction_status == deduction_filter)
-
-    if search_query:
-        norm_search = Vehicle.normalize_registration(search_query)
-        query = query.filter(
-            db.or_(
-                Challan.challan_number.ilike(f"%{search_query}%"),
-                Challan.violation_type.ilike(f"%{search_query}%"),
-                Challan.driver_name.ilike(f"%{search_query}%"),
-                Challan.trip_reference.ilike(f"%{search_query}%"),
-                Challan.violation_location.ilike(f"%{search_query}%"),
-                Vehicle.registration_number.ilike(f"%{norm_search}%"),
-                Vehicle.display_reg_number.ilike(f"%{search_query}%"),
-            )
-        )
-
-    challans = query.order_by(Challan.violation_date.desc(), Challan.created_at.desc()).all()
+    pagination = query.paginate(page=page, per_page=50, error_out=False)
+    challans = pagination.items
 
     total_count = Challan.query.count()
     unpaid_count = Challan.query.filter(
@@ -67,6 +52,7 @@ def index():
     return render_template(
         "challans/index.html",
         challans=challans,
+        pagination=pagination,
         total_count=total_count,
         unpaid_count=unpaid_count,
         pending_deduction_count=pending_deduction_count,
@@ -75,6 +61,7 @@ def index():
         selected_vehicle_id=vehicle_filter,
         selected_status=status_filter,
         selected_deduction=deduction_filter,
+        selected_sort=sort_by,
         search_query=search_query,
     )
 
@@ -241,6 +228,9 @@ def acknowledge_all():
 @login_required
 def simulate_live_alert():
     """Simulate a roadside speed camera triggering an instant in-app challan notification with photo evidence."""
+    if not current_app.debug:
+        flash("Simulated alerts are disabled in production mode.", "warning")
+        return redirect(url_for("challans.index"))
     import random
     vehicle = Vehicle.query.filter_by(is_active=True).first()
     if not vehicle:
