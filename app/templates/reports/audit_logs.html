@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Compliance Audit Logs{% endblock %}
+{% block page_title %}Compliance Audit Trail{% endblock %}
+{% block page_subtitle %}Immutable record of user logins, Excel exports, sign-off syncs, and challan updates{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+        <div>
+            <h6 class="fw-bold text-dark mb-0">System Activity Logs</h6>
+            <small class="text-muted">Total: {{ pagination.total }} event(s)</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <form method="GET" action="{{ url_for('reports.audit_logs') }}" class="d-flex gap-2">
+                <select name="action" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 210px;">
+                    <option value="">All Actions</option>
+                    {% for act in actions %}
+                        <option value="{{ act }}" {% if selected_action == act %}selected{% endif %}>{{ act }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light fs-8 text-uppercase text-secondary">
+                    <tr>
+                        <th class="ps-3">Timestamp (UTC)</th>
+                        <th>Action</th>
+                        <th>User</th>
+                        <th>Entity</th>
+                        <th>Details</th>
+                        <th class="pe-3">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if logs %}
+                        {% for log in logs %}
+                            <tr>
+                                <td class="ps-3 small text-muted text-nowrap">{{ log.timestamp.strftime('%d-%b-%Y %H:%M:%S') if log.timestamp else '-' }}</td>
+                                <td><span class="badge bg-light text-dark border font-monospace">{{ log.action }}</span></td>
+                                <td class="small fw-semibold">{{ log.user.full_name if log.user else 'System' }}</td>
+                                <td class="small text-secondary">{{ log.entity_type or '-' }} {% if log.entity_id %}#{{ log.entity_id }}{% endif %}</td>
+                                <td class="small text-muted" style="max-width: 360px; word-break: break-word;">{{ log.details or '-' }}</td>
+                                <td class="pe-3 small font-monospace text-muted">{{ log.ip_address or '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No audit log entries found.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        {% if pagination.pages > 1 %}
+        <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top bg-light">
+            <small class="text-muted">Page {{ pagination.page }} of {{ pagination.pages }}</small>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('reports.audit_logs', page=pagination.prev_num, action=selected_action) }}">Previous</a>
+                </li>
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('reports.audit_logs', page=pagination.next_num, action=selected_action) }}">Next</a>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

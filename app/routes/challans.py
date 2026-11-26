@@ -1,6 +1,6 @@
 """Challans blueprint handling traffic violation notices, driver tagging, and salary deductions."""
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, send_file
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from app.extensions import db
@@ -224,57 +224,61 @@ def acknowledge_all():
     return redirect(request.referrer or url_for("challans.index"))
 
 
-@challans_bp.route("/simulate-live-alert", methods=["POST"])
+@challans_bp.route("/bulk-action", methods=["POST"])
 @login_required
-def simulate_live_alert():
-    """Simulate a roadside speed camera triggering an instant in-app challan notification with photo evidence."""
-    if not current_app.debug:
-        flash("Simulated alerts are disabled in production mode.", "warning")
-        return redirect(url_for("challans.index"))
-    import random
-    vehicle = Vehicle.query.filter_by(is_active=True).first()
-    if not vehicle:
-        flash("No active vehicle found to simulate.", "warning")
-        return redirect(url_for("challans.index"))
+def bulk_action():
+    """Perform bulk acknowledge or Excel export on selected challans."""
+    challan_ids = request.form.getlist("challan_ids", type=int)
+    action = request.form.get("bulk_action", "").strip()
 
-    timestamp = datetime.now(timezone.utc)
-    cnum = f"MH-ECH-LIVE-{random.randint(100000, 999999)}"
+    if not challan_ids:
+        flash("Please select at least one challan.", "warning")
+        return redirect(request.referrer or url_for("challans.index"))
 
-    # Alternate between daytime expressway speeding and nighttime intersection
-    is_speed = random.choice([True, False])
-    if is_speed:
-        vtype = "Speed Enforcement Camera (94 km/h in 80 km/h Zone)"
-        vloc = "Mumbai-Pune Expressway (KM 42.5 Near Lonavala)"
-        auth = "Highway Safety Police Maharashtra"
-        img = "/static/images/challan_evidence_1.jpg"
-        fine = 2000.00
-    else:
-        vtype = "No Entry / Red Light Violation (Restricted Hours)"
-        vloc = "South Mumbai CST Signal Intersection"
-        auth = "Mumbai Traffic Police"
-        img = "/static/images/challan_evidence_2.jpg"
-        fine = 4000.00
+    if action == "acknowledge":
+        updated = Challan.query.filter(Challan.id.in_(challan_ids)).update(
+            {"is_acknowledged": True}, synchronize_session=False
+        )
+        AuditLog.record(
+            action="BULK_CHALLANS_ACKNOWLEDGED",
+            user=current_user,
+            entity_type="Challan",
+            details={"count": updated, "challan_ids": challan_ids},
+        )
+        db.session.commit()
+        flash(f"Acknowledged {updated} selected challan alert(s).", "success")
+        return redirect(request.referrer or url_for("challans.index"))
 
-    new_c = Challan(
-        vehicle_id=vehicle.id,
-        challan_number=cnum,
-        violation_type=vtype,
-        violation_description="Automated surveillance CCTV camera radar detection for vehicle on the move.",
-        violation_location=vloc,
-        violation_date=timestamp,
-        issuing_authority=auth,
-        penalty_amount=fine,
-        status=Challan.STATUS_PENDING,
-        payment_status=Challan.PAYMENT_UNPAID,
-        source="Roadside Automated Camera System",
-        evidence_image_url=img,
-        is_acknowledged=False,
-    )
-    db.session.add(new_c)
-    db.session.commit()
+    if action == "export_excel":
+        from app.models.payment import Payment
+        from app.services.excel_reports import generate_challan_checklist_workbook
 
-    flash(
-        f"🚨 IN-APP ALERT: Roadside camera detected {vtype} for Truck {vehicle.formatted_registration} at {vloc}! Photo evidence attached.",
-        "danger",
-    )
-    return redirect(url_for("challans.index"))
+        selected_challans = (
+            Challan.query.filter(Challan.id.in_(challan_ids))
+            .order_by(Challan.penalty_amount.desc(), Challan.violation_date.desc())
+            .all()
+        )
+        payments = Payment.query.filter(Payment.challan_id.in_(challan_ids)).all()
+        workbook_io = generate_challan_checklist_workbook(
+            challans=selected_challans,
+            payments=payments,
+            generated_by=current_user.full_name,
+            filters_summary=f"Selected {len(selected_challans)} Challan(s)",
+        )
+        AuditLog.record(
+            action="EXCEL_REPORT_EXPORTED",
+            user=current_user,
+            entity_type="Report",
+            details={"report_type": "bulk_selected_challans", "row_count": len(selected_challans)},
+        )
+        db.session.commit()
+        stamp = datetime.now().strftime("%Y%m%d_%H%M")
+        return send_file(
+            workbook_io,
+            as_attachment=True,
+            download_name=f"Balaji_Selected_Challans_{stamp}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    flash("Invalid bulk action requested.", "danger")
+    return redirect(request.referrer or url_for("challans.index"))

@@ -110,16 +110,6 @@
                     </div>
                     {% if current_user.is_authenticated %}
                     <div class="d-flex align-items-center gap-3">
-                        {% if config.DEBUG %}
-                        <!-- Simulate Roadside Live Challan Trigger (Debug Only) -->
-                        <form action="{{ url_for('challans.simulate_live_alert') }}" method="POST" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold shadow-sm" title="Simulate a roadside speed camera detecting a truck right now">
-                                <i class="bi bi-broadcast me-1"></i> Test Live Roadside Alert
-                            </button>
-                        </form>
-                        {% endif %}
-
                         <!-- Live Notification Bell Dropdown -->
                         <div class="dropdown">
                             <button class="btn btn-light position-relative border p-2 rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Live Roadside Challan Alerts">

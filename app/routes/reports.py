@@ -1,7 +1,8 @@
 """Reports blueprint for generating and downloading multi-person Excel checklists."""
 from datetime import datetime
-from flask import Blueprint, render_template, request, send_file
+from flask import Blueprint, render_template, request, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
+from openpyxl import load_workbook
 from app.extensions import db
 from app.models.challan import Challan
 from app.models.payment import Payment
@@ -149,4 +150,95 @@ def export_vehicles_excel():
         as_attachment=True,
         download_name=f"Balaji_Vehicle_Compliance_{stamp}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@reports_bp.route("/import-signoff", methods=["POST"])
+@login_required
+def import_signoff_excel():
+    """Import Checked By (Sign-off) and Reviewer Remarks from a reviewed Excel checklist."""
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename.lower().endswith(".xlsx"):
+        flash("Please upload a valid .xlsx Excel checklist file.", "danger")
+        return redirect(url_for("reports.index"))
+
+    try:
+        wb = load_workbook(uploaded, data_only=True)
+    except Exception:
+        flash("Could not read the uploaded Excel file. Ensure it is a valid .xlsx workbook.", "danger")
+        return redirect(url_for("reports.index"))
+
+    if "Challan Checklist" not in wb.sheetnames:
+        flash("Uploaded workbook does not contain a 'Challan Checklist' sheet.", "danger")
+        return redirect(url_for("reports.index"))
+
+    ws = wb["Challan Checklist"]
+    headers = [str(cell.value).strip() if cell.value is not None else "" for cell in ws[1]]
+    col_map = {h: idx for idx, h in enumerate(headers)}
+
+    if "Challan No." not in col_map:
+        flash("Missing 'Challan No.' column in 'Challan Checklist' sheet.", "danger")
+        return redirect(url_for("reports.index"))
+
+    cno_idx = col_map["Challan No."]
+    signoff_idx = col_map.get("Checked By (Sign-off)")
+    remarks_idx = col_map.get("Reviewer Remarks")
+
+    updated_count = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        cno_raw = row[cno_idx] if cno_idx < len(row) else None
+        if not cno_raw:
+            continue
+        cno_str = str(cno_raw).strip()
+        signoff = str(row[signoff_idx]).strip() if signoff_idx is not None and signoff_idx < len(row) and row[signoff_idx] is not None else ""
+        remarks = str(row[remarks_idx]).strip() if remarks_idx is not None and remarks_idx < len(row) and row[remarks_idx] is not None else ""
+
+        if not signoff and not remarks:
+            continue
+
+        challan = None
+        if cno_str.startswith("ID-") and cno_str[3:].isdigit():
+            challan = db.session.get(Challan, int(cno_str[3:]))
+        else:
+            challan = Challan.query.filter_by(challan_number=cno_str).first()
+
+        if challan:
+            if signoff:
+                challan.assigned_staff = signoff[:120]
+            if remarks:
+                challan.notes = remarks
+            challan.last_verified_at = datetime.now()
+            updated_count += 1
+
+    AuditLog.record(
+        action="EXCEL_SIGNOFF_IMPORTED",
+        user=current_user,
+        entity_type="Report",
+        details={"updated_challans": updated_count, "filename": uploaded.filename},
+    )
+    db.session.commit()
+    flash(f"Synced sign-off & reviewer remarks for {updated_count} challan(s) from Excel.", "success")
+    return redirect(url_for("reports.index"))
+
+
+@reports_bp.route("/audit-logs", methods=["GET"])
+@login_required
+def audit_logs():
+    """Browse recent compliance and user activity audit logs."""
+    action_filter = request.args.get("action", "").strip()
+    page = request.args.get("page", 1, type=int)
+
+    query = AuditLog.query
+    if action_filter:
+        query = query.filter(AuditLog.action == action_filter)
+
+    pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    actions = [row[0] for row in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action).all()]
+
+    return render_template(
+        "reports/audit_logs.html",
+        logs=pagination.items,
+        pagination=pagination,
+        actions=actions,
+        selected_action=action_filter,
     )

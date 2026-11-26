@@ -111,3 +111,53 @@ def test_is_safe_redirect_url(app):
         assert is_safe_redirect_url("https://evil.example.com/phish") is False
         assert is_safe_redirect_url("javascript:alert(1)") is False
 
+
+def test_bulk_challan_actions_and_signoff_import(client, admin_user, sample_vehicle, sample_challan):
+    """Verify bulk acknowledge, bulk Excel export, sign-off re-import, and audit log viewer."""
+    client.post("/auth/login", data={"username": "admin_ceo", "password": "SecureAdmin#2026"})
+
+    # Bulk acknowledge
+    resp_ack = client.post(
+        "/challans/bulk-action",
+        data={"challan_ids": [sample_challan.id], "bulk_action": "acknowledge"},
+        follow_redirects=True,
+    )
+    assert resp_ack.status_code == 200
+    assert b"Acknowledged 1 selected challan" in resp_ack.data
+
+    # Bulk Excel export
+    resp_exp = client.post(
+        "/challans/bulk-action",
+        data={"challan_ids": [sample_challan.id], "bulk_action": "export_excel"},
+    )
+    assert resp_exp.status_code == 200
+    assert "spreadsheetml.sheet" in resp_exp.content_type
+
+    # Modify exported Excel with Checked By & Reviewer Remarks and re-import
+    wb = load_workbook(BytesIO(resp_exp.data))
+    ws = wb["Challan Checklist"]
+    ws.cell(row=2, column=18, value="Ramesh (Accounts)")
+    ws.cell(row=2, column=19, value="Verified with Parivahan receipt")
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    resp_imp = client.post(
+        "/reports/import-signoff",
+        data={"file": (buf, "reviewed.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp_imp.status_code == 200
+    assert b"Synced sign-off &amp; reviewer remarks for 1 challan" in resp_imp.data
+
+    with client.application.app_context():
+        refreshed = db.session.get(Challan, sample_challan.id)
+        assert refreshed.assigned_staff == "Ramesh (Accounts)"
+        assert refreshed.notes == "Verified with Parivahan receipt"
+
+    # Audit log viewer
+    resp_logs = client.get("/reports/audit-logs")
+    assert resp_logs.status_code == 200
+    assert b"EXCEL_SIGNOFF_IMPORTED" in resp_logs.data
+
