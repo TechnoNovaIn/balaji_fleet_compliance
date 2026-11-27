@@ -7,6 +7,7 @@ from app.models.payment import Payment
 from app.models.challan import Challan
 from app.models.vehicle import Vehicle
 from app.models.audit_log import AuditLog
+from app.utils.decorators import accounts_or_admin_required
 
 payments_bp = Blueprint("payments", __name__, url_prefix="/payments")
 
@@ -56,6 +57,7 @@ def index():
 
 @payments_bp.route("/record", methods=["POST"])
 @login_required
+@accounts_or_admin_required
 def record():
     """Route that receives and processes new payment information."""
     challan_id = request.form.get("challan_id", type=int)

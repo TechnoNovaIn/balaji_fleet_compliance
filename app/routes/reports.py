@@ -9,6 +9,7 @@ from app.models.payment import Payment
 from app.models.vehicle import Vehicle
 from app.models.audit_log import AuditLog
 from app.services.challan_queries import build_filtered_challans_query
+from app.utils.decorators import roles_required
 from app.services.excel_reports import (
     generate_challan_checklist_workbook,
     generate_vehicle_compliance_workbook,
@@ -155,6 +156,7 @@ def export_vehicles_excel():
 
 @reports_bp.route("/import-signoff", methods=["POST"])
 @login_required
+@roles_required("admin", "manager", "accounts")
 def import_signoff_excel():
     """Import Checked By (Sign-off) and Reviewer Remarks from a reviewed Excel checklist."""
     uploaded = request.files.get("file")

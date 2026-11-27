@@ -37,10 +37,13 @@ def build_database_uri() -> str:
     return f"sqlite:///{instance_dir / 'fleet_compliance.db'}"
 
 
+DEFAULT_DEV_SECRET_KEY = "dev-secret-key-balaji-fleet-2026"
+
+
 class Config:
     """Base application configuration."""
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-balaji-fleet-2026")
+    SECRET_KEY = os.environ.get("SECRET_KEY", DEFAULT_DEV_SECRET_KEY)
     SQLALCHEMY_DATABASE_URI = build_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -85,7 +88,8 @@ class ProductionConfig(Config):
 
     DEBUG = False
     TESTING = False
-    SESSION_COOKIE_SECURE = True
+    SECRET_KEY = os.environ.get("SECRET_KEY")
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "True").lower() in ("true", "1", "t")
 
 
 class TestingConfig(Config):

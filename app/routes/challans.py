@@ -1,6 +1,6 @@
 """Challans blueprint handling traffic violation notices, driver tagging, and salary deductions."""
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, send_file
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, send_file, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from app.extensions import db
@@ -10,6 +10,7 @@ from app.models.monitoring_log import MonitoringLog
 from app.models.audit_log import AuditLog
 from app.services.challan_monitor import ChallanMonitorService
 from app.services.challan_queries import build_filtered_challans_query
+from app.utils.decorators import manager_or_admin_required
 
 challans_bp = Blueprint("challans", __name__, url_prefix="/challans")
 
@@ -68,6 +69,7 @@ def index():
 
 @challans_bp.route("/<int:challan_id>/tag-driver", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def tag_driver(challan_id):
     """Assign driver details and update salary deduction status for a challan."""
     challan = db.session.get(Challan, challan_id)
@@ -163,6 +165,7 @@ def deductions_ledger():
 
 @challans_bp.route("/check-live/<int:vehicle_id>", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def check_live(vehicle_id):
     """Trigger an on-demand live challan check for a specific vehicle."""
     vehicle = db.session.get(Vehicle, vehicle_id)
@@ -204,6 +207,7 @@ def check_live(vehicle_id):
 
 @challans_bp.route("/<int:challan_id>/acknowledge", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def acknowledge(challan_id):
     """Acknowledge an in-app roadside challan alert."""
     challan = db.session.get(Challan, challan_id)
@@ -216,6 +220,7 @@ def acknowledge(challan_id):
 
 @challans_bp.route("/acknowledge-all", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def acknowledge_all():
     """Mark all active alerts as reviewed."""
     Challan.query.filter_by(is_acknowledged=False).update({"is_acknowledged": True})
@@ -236,6 +241,8 @@ def bulk_action():
         return redirect(request.referrer or url_for("challans.index"))
 
     if action == "acknowledge":
+        if not current_user.has_role("admin", "manager"):
+            abort(403)
         updated = Challan.query.filter(Challan.id.in_(challan_ids)).update(
             {"is_acknowledged": True}, synchronize_session=False
         )

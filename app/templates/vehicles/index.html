@@ -201,23 +201,9 @@
                     <label class="form-label fw-bold mb-2">Select Scope to Verify</label>
                     <div class="list-group mb-3">
                         <label class="list-group-item d-flex gap-3 align-items-center cursor-pointer">
-                            <input class="form-check-input flex-shrink-0" type="radio" name="batch_size" value="top15" checked>
+                            <input class="form-check-input flex-shrink-0" type="radio" name="batch_size" value="all" checked>
                             <span>
-                                <strong>Top 15 Active Vehicles</strong>
-                                <small class="d-block text-muted">Review compliance status for priority fleet units</small>
-                            </span>
-                        </label>
-                        <label class="list-group-item d-flex gap-3 align-items-center cursor-pointer">
-                            <input class="form-check-input flex-shrink-0" type="radio" name="batch_size" value="50">
-                            <span>
-                                <strong>Top 50 Active Vehicles</strong>
-                                <small class="d-block text-muted">Batch review across active vehicles</small>
-                            </span>
-                        </label>
-                        <label class="list-group-item d-flex gap-3 align-items-center cursor-pointer">
-                            <input class="form-check-input flex-shrink-0" type="radio" name="batch_size" value="all">
-                            <span>
-                                <strong>All {{ total_count }} Registered Fleet Vehicles</strong>
+                                <strong>Scan All ({{ total_count }} Registered Fleet Vehicles)</strong>
                                 <small class="d-block text-muted">Complete fleet review</small>
                             </span>
                         </label>

@@ -4,7 +4,7 @@ import click
 from datetime import datetime, timezone
 from flask import Flask, render_template
 from app.extensions import db, migrate, login_manager, csrf
-from config import config_by_name
+from config import config_by_name, DEFAULT_DEV_SECRET_KEY
 
 
 def format_inr(value) -> str:
@@ -32,6 +32,13 @@ def create_app(config_name=None) -> Flask:
 
     app = Flask(__name__)
     app.config.from_object(config_by_name.get(config_name, config_by_name["default"]))
+
+    if config_name == "production":
+        secret_key = app.config.get("SECRET_KEY")
+        if not secret_key or secret_key == DEFAULT_DEV_SECRET_KEY:
+            raise RuntimeError(
+                "SECRET_KEY environment variable must be set to a strong non-default value in production."
+            )
 
     # Ensure required instance folders exist
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

@@ -9,6 +9,7 @@ from app.models.vehicle import Vehicle
 from app.models.monitoring_log import MonitoringLog
 from app.models.audit_log import AuditLog
 from app.services.challan_monitor import ChallanMonitorService
+from app.utils.decorators import manager_or_admin_required
 
 vehicles_bp = Blueprint("vehicles", __name__, url_prefix="/vehicles")
 
@@ -29,21 +30,21 @@ TOP_15_TEST_VEHICLES = [
 
 @vehicles_bp.route("/scan-fleet", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def scan_fleet():
     """Trigger live challan scan across fleet vehicles."""
     import os
-    batch_val = request.form.get("batch_size", "top15").strip()
+    batch_val = request.form.get("batch_size", "all").strip()
     api_token = request.form.get("api_token", "").strip()
 
     vehicles_to_check = None
-    if batch_val == "top15":
-        vehicles_to_check = Vehicle.query.filter(Vehicle.registration_number.in_(TOP_15_TEST_VEHICLES)).all()
-        limit = len(vehicles_to_check)
+    if batch_val == "all" or not batch_val:
+        limit = None
     else:
         try:
-            limit = None if batch_val == "all" else int(batch_val)
+            limit = int(batch_val)
         except ValueError:
-            limit = 15
+            limit = None
 
     if api_token:
         provider = MastersIndiaChallanProvider(api_token=api_token, allow_sandbox=True)
@@ -167,6 +168,7 @@ def download_template():
 
 @vehicles_bp.route("/upload", methods=["POST"])
 @login_required
+@manager_or_admin_required
 def upload_excel():
     """Bulk import vehicles from Excel (.xlsx/.xls) or CSV."""
     if "file" not in request.files:

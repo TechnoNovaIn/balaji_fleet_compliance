@@ -8,13 +8,16 @@ from app.extensions import db, login_manager
 class User(UserMixin, db.Model):
     __tablename__ = "users"
 
-    ROLE_ADMIN = "admin"  # Single Administrator
-    ROLE_MANAGER = "admin"
-    ROLE_ACCOUNTS = "admin"
-    ROLE_VIEWER = "admin"
+    ROLE_ADMIN = "admin"
+    ROLE_MANAGER = "manager"
+    ROLE_ACCOUNTS = "accounts"
+    ROLE_VIEWER = "viewer"
 
     ROLES = {
         ROLE_ADMIN: "Administrator",
+        ROLE_MANAGER: "Transport Manager",
+        ROLE_ACCOUNTS: "Accounts Team",
+        ROLE_VIEWER: "Viewer",
     }
 
     id = db.Column(db.Integer, primary_key=True)
@@ -55,29 +58,29 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def has_role(self, *roles: str) -> bool:
-        """Single login architecture: admin user has universal access."""
-        return True
+        """Check whether the user holds any of the specified roles."""
+        return self.role in roles
 
     @property
     def role_label(self) -> str:
         """Human-readable role title."""
-        return "Administrator"
+        return self.ROLES.get(self.role, (self.role or "User").title())
 
     @property
     def is_admin(self) -> bool:
-        return True
+        return self.role == self.ROLE_ADMIN
 
     @property
     def is_manager(self) -> bool:
-        return True
+        return self.role in (self.ROLE_ADMIN, self.ROLE_MANAGER)
 
     @property
     def is_accounts(self) -> bool:
-        return True
+        return self.role in (self.ROLE_ADMIN, self.ROLE_ACCOUNTS)
 
     @property
     def is_viewer(self) -> bool:
-        return True
+        return self.role == self.ROLE_VIEWER
 
     def __repr__(self) -> str:
         return f"<User {self.username} ({self.role})>"
