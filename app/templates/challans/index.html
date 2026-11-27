@@ -8,12 +8,26 @@
 <div class="card border-0 shadow-sm rounded-3">
     <div class="card-header bg-white border-0 py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-            <h6 class="fw-bold text-dark mb-0">Live Traffic Violations & Camera Captures</h6>
-            <small class="text-muted">Total: <strong>{{ total_count }}</strong> &bull; Unpaid: <strong class="text-danger">{{ unpaid_count }}</strong></small>
+            <h6 class="fw-bold text-dark mb-1">Live Traffic Violations & Camera Captures</h6>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <a href="{{ url_for('challans.index', tab='unpaid', vehicle_id=selected_vehicle_id or '', sort=selected_sort, search=search_query) }}"
+                   class="btn btn-sm fw-semibold {% if active_tab == 'unpaid' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                    Unpaid / New <span class="badge bg-white text-danger ms-1">{{ unpaid_count }}</span>
+                </a>
+                <a href="{{ url_for('challans.index', tab='paid', vehicle_id=selected_vehicle_id or '', sort=selected_sort, search=search_query) }}"
+                   class="btn btn-sm fw-semibold {% if active_tab == 'paid' %}btn-success{% else %}btn-outline-success{% endif %}">
+                    Paid / Settled <span class="badge bg-white text-success ms-1">{{ paid_count }}</span>
+                </a>
+                <a href="{{ url_for('challans.index', tab='all', vehicle_id=selected_vehicle_id or '', sort=selected_sort, search=search_query) }}"
+                   class="btn btn-sm fw-semibold {% if active_tab == 'all' %}btn-navy{% else %}btn-outline-secondary{% endif %}">
+                    All <span class="badge bg-light text-dark ms-1">{{ total_count }}</span>
+                </a>
+            </div>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
             <!-- Filter and Search Form -->
             <form method="GET" action="{{ url_for('challans.index') }}" class="d-flex align-items-center gap-2 flex-wrap">
+                <input type="hidden" name="tab" value="{{ active_tab }}">
                 <!-- Vehicles Dropdown to Check Vehicle Details -->
                 <select name="vehicle_id" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 175px;">
                     <option value="">All Vehicles</option>
@@ -199,6 +213,15 @@
                                         </button>
                                     {% endif %}
 
+                                    {% if c.payment_status != 'paid' and current_user.has_role('admin', 'manager', 'accounts') %}
+                                        <form action="{{ url_for('challans.mark_paid', challan_id=c.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-success btn-sm py-1 px-2" title="Mark challan as Paid">
+                                                <i class="bi bi-check-circle me-1"></i> Mark Paid
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
                                     {% if not c.is_acknowledged %}
                                         <form action="{{ url_for('challans.acknowledge', challan_id=c.id) }}" method="POST" class="d-inline">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -274,10 +297,10 @@
             <nav aria-label="Challans pagination">
                 <ul class="pagination pagination-sm mb-0">
                     <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('challans.index', page=pagination.prev_num, vehicle_id=selected_vehicle_id, status=selected_status, sort=selected_sort, search=search_query) }}">Previous</a>
+                        <a class="page-link" href="{{ url_for('challans.index', page=pagination.prev_num, tab=active_tab, vehicle_id=selected_vehicle_id, status=selected_status, sort=selected_sort, search=search_query) }}">Previous</a>
                     </li>
                     <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('challans.index', page=pagination.next_num, vehicle_id=selected_vehicle_id, status=selected_status, sort=selected_sort, search=search_query) }}">Next</a>
+                        <a class="page-link" href="{{ url_for('challans.index', page=pagination.next_num, tab=active_tab, vehicle_id=selected_vehicle_id, status=selected_status, sort=selected_sort, search=search_query) }}">Next</a>
                     </li>
                 </ul>
             </nav>

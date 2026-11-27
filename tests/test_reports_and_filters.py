@@ -4,6 +4,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 from app.extensions import db
 from app.models.challan import Challan
+from app.models.vehicle import Vehicle
 
 
 def test_challans_highest_amount_filter(client, admin_user, sample_vehicle):
@@ -160,4 +161,60 @@ def test_bulk_challan_actions_and_signoff_import(client, admin_user, sample_vehi
     resp_logs = client.get("/reports/audit-logs")
     assert resp_logs.status_code == 200
     assert b"EXCEL_SIGNOFF_IMPORTED" in resp_logs.data
+
+
+def test_paid_unpaid_tabs_mark_paid_and_excel_balance(client, admin_user, sample_vehicle, sample_challan):
+    """Verify Unpaid/Paid tab separation, Mark Paid action, and Excel Paid balance calculation."""
+    client.post("/auth/login", data={"username": "admin_ceo", "password": "SecureAdmin#2026"})
+
+    # Initially unpaid: appears on unpaid tab, not on paid tab
+    assert sample_challan.challan_number.encode() in client.get("/challans/?tab=unpaid").data
+    assert sample_challan.challan_number.encode() not in client.get("/challans/?tab=paid").data
+
+    # Mark Paid directly
+    resp_paid = client.post(f"/challans/{sample_challan.id}/mark-paid", follow_redirects=True)
+    assert resp_paid.status_code == 200
+
+    # Now appears on paid tab, not on unpaid tab
+    assert sample_challan.challan_number.encode() not in client.get("/challans/?tab=unpaid").data
+    assert sample_challan.challan_number.encode() in client.get("/challans/?tab=paid").data
+
+    # Excel export for API-settled Paid challan shows Paid Amount == Fine Amount and Balance Due == 0
+    resp_xlsx = client.get("/reports/export/challans")
+    wb = load_workbook(BytesIO(resp_xlsx.data))
+    ws = wb["Challan Checklist"]
+    assert ws.cell(row=2, column=10).value == 2000.0  # Fine Amount
+    assert ws.cell(row=2, column=11).value == 2000.0  # Paid Amount
+    assert ws.cell(row=2, column=12).value == 0.0     # Balance Due
+
+
+def test_vehicle_toggle_active_and_sync_excel(client, admin_user, sample_vehicle):
+    """Verify vehicle Active/Inactive toggle and Sync Active Fleet Excel upload."""
+    import pandas as pd
+
+    client.post("/auth/login", data={"username": "admin_ceo", "password": "SecureAdmin#2026"})
+
+    # Toggle inactive then active
+    client.post(f"/vehicles/{sample_vehicle.id}/toggle-active")
+    with client.application.app_context():
+        assert db.session.get(Vehicle, sample_vehicle.id).is_active is False
+
+    # Upload Excel with a different active vehicle + sync_active=1
+    df = pd.DataFrame({"Registration Number": ["KA01AB9999"], "Vehicle Type": ["Truck"]})
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buf.seek(0)
+
+    resp = client.post(
+        "/vehicles/upload",
+        data={"file": (buf, "active.xlsx"), "sync_active": "1"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    with client.application.app_context():
+        v_new = Vehicle.query.filter_by(registration_number="KA01AB9999").first()
+        assert v_new is not None and v_new.is_active is True
+        assert db.session.get(Vehicle, sample_vehicle.id).is_active is False
 

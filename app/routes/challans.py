@@ -1,6 +1,6 @@
 """Challans blueprint handling traffic violation notices, driver tagging, and salary deductions."""
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, send_file, abort
+from flask import Blueprint, render_template, request, flash, redirect, url_for, send_file, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from app.extensions import db
@@ -10,7 +10,7 @@ from app.models.monitoring_log import MonitoringLog
 from app.models.audit_log import AuditLog
 from app.services.challan_monitor import ChallanMonitorService
 from app.services.challan_queries import build_filtered_challans_query
-from app.utils.decorators import manager_or_admin_required
+from app.utils.decorators import manager_or_admin_required, roles_required
 
 challans_bp = Blueprint("challans", __name__, url_prefix="/challans")
 
@@ -19,12 +19,23 @@ challans_bp = Blueprint("challans", __name__, url_prefix="/challans")
 @login_required
 def index():
     """Challan management listing with driver, location, and deduction filters."""
+    tab_param = request.args.get("tab", "").strip()
     status_filter = request.args.get("status", "").strip()
     vehicle_filter = request.args.get("vehicle_id", type=int)
     deduction_filter = request.args.get("deduction", "").strip()
     sort_by = request.args.get("sort", "").strip()
     search_query = request.args.get("search", "").strip()
     page = request.args.get("page", 1, type=int)
+
+    if tab_param in ("unpaid", "paid", "all"):
+        active_tab = tab_param
+        if not status_filter:
+            status_filter = "" if active_tab == "all" else active_tab
+    elif status_filter in ("unpaid", "paid"):
+        active_tab = status_filter
+    else:
+        active_tab = "unpaid"
+        status_filter = "unpaid"
 
     query = build_filtered_challans_query(
         vehicle_id=vehicle_filter,
@@ -41,6 +52,7 @@ def index():
     unpaid_count = Challan.query.filter(
         Challan.payment_status.in_([Challan.PAYMENT_UNPAID, Challan.PAYMENT_PARTIALLY_PAID])
     ).count()
+    paid_count = Challan.query.filter(Challan.payment_status == Challan.PAYMENT_PAID).count()
     pending_deduction_count = Challan.query.filter(
         Challan.deduction_status == Challan.DEDUCTION_PENDING,
         Challan.driver_name.isnot(None),
@@ -56,6 +68,8 @@ def index():
         pagination=pagination,
         total_count=total_count,
         unpaid_count=unpaid_count,
+        paid_count=paid_count,
+        active_tab=active_tab,
         pending_deduction_count=pending_deduction_count,
         vehicles=vehicles,
         selected_vehicle=selected_vehicle,
@@ -215,6 +229,31 @@ def acknowledge(challan_id):
         challan.is_acknowledged = True
         db.session.commit()
         flash(f"Alert for Challan #{challan.challan_number or challan.id} marked as reviewed.", "success")
+    return redirect(request.referrer or url_for("challans.index"))
+
+
+@challans_bp.route("/<int:challan_id>/mark-paid", methods=["POST"])
+@login_required
+@roles_required("admin", "manager", "accounts")
+def mark_paid(challan_id):
+    """Mark a challan as Paid / Settled directly from the Traffic Challans page."""
+    challan = db.session.get(Challan, challan_id)
+    if not challan:
+        flash("Challan not found.", "danger")
+        return redirect(url_for("challans.index"))
+
+    challan.status = Challan.STATUS_PAID
+    challan.payment_status = Challan.PAYMENT_PAID
+    challan.is_acknowledged = True
+    AuditLog.record(
+        action="CHALLAN_MARKED_PAID",
+        user=current_user,
+        entity_type="Challan",
+        entity_id=challan.id,
+        details={"challan_number": challan.challan_number, "amount": float(challan.penalty_amount or 0)},
+    )
+    db.session.commit()
+    flash(f"Challan #{challan.challan_number or challan.id} marked as Paid.", "success")
     return redirect(request.referrer or url_for("challans.index"))
 
 

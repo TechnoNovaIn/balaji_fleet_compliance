@@ -47,6 +47,16 @@ def _auto_fit_columns(ws, max_width: int = 40) -> None:
         ws.column_dimensions[col_letter].width = min(max(longest + 4, 12), max_width)
 
 
+def _challan_financials(c) -> tuple[float, float, float]:
+    """Return (fine, paid, balance_due), treating API-settled Paid challans as fully settled."""
+    fine = float(c.penalty_amount or 0)
+    raw_paid = float(c.total_paid or 0)
+    if c.payment_status == "paid":
+        paid = max(raw_paid, fine)
+        return fine, paid, 0.0
+    return fine, raw_paid, float(c.remaining_penalty or 0)
+
+
 def generate_challan_checklist_workbook(
     challans: list,
     payments: list,
@@ -69,9 +79,10 @@ def generate_challan_checklist_workbook(
     ws_summary["A1"].font = TITLE_FONT
 
     total_challans = len(challans)
-    total_fine = sum(float(c.penalty_amount or 0) for c in challans)
-    total_paid = sum(float(c.total_paid or 0) for c in challans)
-    total_balance = sum(float(c.remaining_penalty or 0) for c in challans)
+    financials = [_challan_financials(c) for c in challans]
+    total_fine = sum(f for f, _, _ in financials)
+    total_paid = sum(p for _, p, _ in financials)
+    total_balance = sum(d for _, _, d in financials)
     unpaid_count = sum(1 for c in challans if c.payment_status in ("unpaid", "partially_paid"))
 
     meta_rows = [
@@ -97,7 +108,7 @@ def generate_challan_checklist_workbook(
 
     # Per-vehicle breakdown on Summary sheet
     vehicle_stats = {}
-    for c in challans:
+    for c, (fine, paid, due) in zip(challans, financials):
         reg = c.vehicle.formatted_registration if c.vehicle else "Unknown"
         entry = vehicle_stats.setdefault(
             reg,
@@ -106,9 +117,9 @@ def generate_challan_checklist_workbook(
         entry["count"] += 1
         if c.payment_status in ("unpaid", "partially_paid"):
             entry["unpaid"] += 1
-        entry["fine"] += float(c.penalty_amount or 0)
-        entry["paid"] += float(c.total_paid or 0)
-        entry["due"] += float(c.remaining_penalty or 0)
+        entry["fine"] += fine
+        entry["paid"] += paid
+        entry["due"] += due
 
     breakdown_start = len(meta_rows) + 5
     ws_summary.cell(row=breakdown_start - 1, column=1, value="Vehicle-Wise Breakdown").font = TITLE_FONT
@@ -158,11 +169,8 @@ def generate_challan_checklist_workbook(
         ws_list.cell(row=1, column=col_idx, value=h)
     _style_header_row(ws_list, 1, len(headers))
 
-    for idx, c in enumerate(challans, start=1):
+    for idx, (c, (fine, paid, due)) in enumerate(zip(challans, financials), start=1):
         r = idx + 1
-        fine = float(c.penalty_amount or 0)
-        paid = float(c.total_paid or 0)
-        due = float(c.remaining_penalty or 0)
         row_vals = [
             idx,
             c.vehicle.formatted_registration if c.vehicle else "-",

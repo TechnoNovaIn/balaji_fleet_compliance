@@ -11,6 +11,7 @@ from app.models.audit_log import AuditLog
 from app.services.challan_queries import build_filtered_challans_query
 from app.utils.decorators import roles_required
 from app.services.excel_reports import (
+    _challan_financials,
     generate_challan_checklist_workbook,
     generate_vehicle_compliance_workbook,
 )
@@ -36,9 +37,10 @@ def index():
         date_to=date_to,
     ).all()
 
-    total_fine = sum(float(c.penalty_amount or 0) for c in challans)
-    total_paid = sum(float(c.total_paid or 0) for c in challans)
-    total_balance = sum(float(c.remaining_penalty or 0) for c in challans)
+    financials = [_challan_financials(c) for c in challans]
+    total_fine = sum(f for f, _, _ in financials)
+    total_paid = sum(p for _, p, _ in financials)
+    total_balance = sum(d for _, _, d in financials)
     unpaid_count = sum(1 for c in challans if c.payment_status in (Challan.PAYMENT_UNPAID, Challan.PAYMENT_PARTIALLY_PAID))
 
     vehicles = Vehicle.query.filter_by(is_active=True).order_by(Vehicle.display_reg_number).all()

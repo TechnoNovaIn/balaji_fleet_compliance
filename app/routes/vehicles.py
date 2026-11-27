@@ -214,7 +214,11 @@ def upload_excel():
 
         imported_count = 0
         skipped_count = 0
+        reactivated_count = 0
+        deactivated_count = 0
+        uploaded_norms = set()
         error_rows = []
+        sync_active = request.form.get("sync_active") == "1"
 
         for idx, row in df.iterrows():
             raw_reg = str(row["reg_no"]).strip() if pd.notna(row["reg_no"]) else ""
@@ -226,10 +230,16 @@ def upload_excel():
                 error_rows.append(f"Row {idx+2}: Invalid registration number '{raw_reg}'")
                 continue
 
+            uploaded_norms.add(norm_reg)
+
             # Check for existing duplicate
             existing = Vehicle.query.filter_by(registration_number=norm_reg).first()
             if existing:
-                skipped_count += 1
+                if sync_active and not existing.is_active:
+                    existing.is_active = True
+                    reactivated_count += 1
+                else:
+                    skipped_count += 1
                 continue
 
             # Extract fields
@@ -253,6 +263,12 @@ def upload_excel():
             db.session.add(veh)
             imported_count += 1
 
+        if sync_active and uploaded_norms:
+            deactivated_count = Vehicle.query.filter(
+                Vehicle.is_active == True,
+                ~Vehicle.registration_number.in_(uploaded_norms),
+            ).update({"is_active": False}, synchronize_session=False)
+
         db.session.commit()
 
         # Audit log entry
@@ -261,13 +277,24 @@ def upload_excel():
             user=current_user,
             entity_type="Vehicle",
             entity_id=f"Count: {imported_count}",
-            details={"file": file.filename, "imported": imported_count, "skipped_duplicates": skipped_count},
+            details={
+                "file": file.filename,
+                "imported": imported_count,
+                "skipped_duplicates": skipped_count,
+                "reactivated": reactivated_count,
+                "deactivated": deactivated_count,
+                "sync_active": sync_active,
+            },
         )
         db.session.commit()
 
         msg = f"Excel Import Completed: {imported_count} vehicle(s) successfully registered."
         if skipped_count > 0:
             msg += f" {skipped_count} vehicle(s) skipped as duplicates."
+        if reactivated_count > 0:
+            msg += f" {reactivated_count} reactivated."
+        if deactivated_count > 0:
+            msg += f" {deactivated_count} marked Inactive (not in active sheet)."
         flash(msg, "success")
 
     except Exception as exc:
@@ -275,3 +302,27 @@ def upload_excel():
         flash(f"Failed to process Excel file: {str(exc)}", "danger")
 
     return redirect(url_for("vehicles.index"))
+
+
+@vehicles_bp.route("/<int:vehicle_id>/toggle-active", methods=["POST"])
+@login_required
+@manager_or_admin_required
+def toggle_active(vehicle_id):
+    """Toggle a vehicle between Active and Inactive without deleting challan history."""
+    vehicle = db.session.get(Vehicle, vehicle_id)
+    if not vehicle:
+        flash("Vehicle not found.", "danger")
+        return redirect(url_for("vehicles.index"))
+
+    vehicle.is_active = not vehicle.is_active
+    AuditLog.record(
+        action="VEHICLE_STATUS_UPDATED",
+        user=current_user,
+        entity_type="Vehicle",
+        entity_id=vehicle.id,
+        details={"registration": vehicle.registration_number, "is_active": vehicle.is_active},
+    )
+    db.session.commit()
+    state_label = "Active" if vehicle.is_active else "Inactive"
+    flash(f"Vehicle {vehicle.formatted_registration} marked as {state_label}.", "info")
+    return redirect(request.referrer or url_for("vehicles.index"))
