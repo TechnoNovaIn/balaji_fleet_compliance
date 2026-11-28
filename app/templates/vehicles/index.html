@@ -209,10 +209,17 @@
             <form action="{{ url_for('vehicles.scan_fleet') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4">
+                    {% if api_configured %}
+                    <div class="alert alert-success py-2 px-3 small mb-3">
+                        <i class="bi bi-check-circle-fill me-1"></i>
+                        External live API is <strong>Active</strong> (Provider: <strong>{{ active_provider_name }}</strong>).
+                    </div>
+                    {% else %}
                     <div class="alert alert-secondary py-2 px-3 small mb-3">
                         <i class="bi bi-shield-lock me-1"></i>
                         External live API is <strong>disabled</strong>. Mode: <strong>Manual / Staff Verification</strong>. No external API calls are made until you configure an API key in <code>.env</code>.
                     </div>
+                    {% endif %}
 
                     <label class="form-label fw-bold mb-2">Select Scope to Verify</label>
                     <div class="list-group mb-3">

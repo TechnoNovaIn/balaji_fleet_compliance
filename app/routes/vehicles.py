@@ -104,6 +104,11 @@ def index():
     vehicles = pagination.items
     total_count = Vehicle.query.count()
     active_count = Vehicle.query.filter_by(is_active=True).count()
+    provider = get_default_challan_provider()
+    api_configured = (
+        provider.is_configured()
+        and provider.provider_name != "Manual Verification (Authorized Staff)"
+    )
 
     return render_template(
         "vehicles/index.html",
@@ -115,6 +120,8 @@ def index():
         selected_type=type_filter,
         search_query=search_query,
         vehicle_types=Vehicle.VEHICLE_TYPES,
+        active_provider_name=provider.provider_name,
+        api_configured=api_configured,
     )
 
 

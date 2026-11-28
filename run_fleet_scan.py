@@ -1,4 +1,4 @@
-"""Standalone execution runner for Masters India e-Challan API.
+"""Standalone execution runner for Fleet e-Challan API scanning.
 
 Usage:
     # Check top 10 vehicles:
@@ -14,14 +14,35 @@ import sys
 import argparse
 import time
 from app import create_app
-from app.extensions import db
 from app.models.vehicle import Vehicle
-from app.services.challan_provider import MastersIndiaChallanProvider
+from app.services.challan_provider import (
+    ManualVerificationProvider,
+    MastersIndiaChallanProvider,
+    SurepassChallanProvider,
+)
 from app.services.challan_monitor import ChallanMonitorService
 
 
+def resolve_provider(app):
+    """Select the active challan provider from app.config['CHALLAN_DATA_PROVIDER']."""
+    provider_key = (app.config.get("CHALLAN_DATA_PROVIDER") or "manual").strip().lower()
+    if provider_key == "surepass":
+        return SurepassChallanProvider(
+            endpoint_url=app.config.get("SUREPASS_CHALLAN_API_URL") or None,
+        )
+    if provider_key in ("masters_india", "mastersindia"):
+        return MastersIndiaChallanProvider(
+            api_token=app.config.get("MASTERS_INDIA_API_TOKEN"),
+            username=app.config.get("MASTERS_INDIA_USERNAME"),
+            password=app.config.get("MASTERS_INDIA_PASSWORD"),
+            endpoint_url=app.config.get("MASTERS_INDIA_API_URL"),
+            auth_url=app.config.get("MASTERS_INDIA_AUTH_URL"),
+        )
+    return ManualVerificationProvider()
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Balaji Fleet - Masters India e-Challan Scanner")
+    parser = argparse.ArgumentParser(description="Balaji Fleet - Live e-Challan Scanner")
     parser.add_argument("--limit", type=int, default=10, help="Number of vehicles to check (default: 10)")
     parser.add_argument("--all", action="store_true", help="Scan all registered fleet vehicles")
     parser.add_argument("--vehicle", type=str, help="Specific vehicle registration number to check")
@@ -30,11 +51,12 @@ def main():
 
     app = create_app()
     with app.app_context():
-        provider = MastersIndiaChallanProvider()
+        provider = resolve_provider(app)
+        endpoint = getattr(provider, "endpoint_url", None) or "N/A (Manual Mode)"
         print("=" * 65)
         print(" BALAJI FLEET COMPLIANCE - LIVE E-CHALLAN SCANNER")
-        print(" Provider: Masters India Vehicle e-Challan API (v2 SBT)")
-        print(f" Endpoint: {provider.endpoint_url}")
+        print(f" Provider:   {provider.provider_name}")
+        print(f" Endpoint:   {endpoint}")
         print(f" Configured: {'YES' if provider.is_configured() else 'NO (Requires API credentials in .env)'}")
         print("=" * 65)
 
@@ -87,7 +109,7 @@ def main():
                 time.sleep(args.delay)
 
         print("-" * 65)
-        print(f"Scan Completed:")
+        print("Scan Completed:")
         print(f"  Total Queried:    {total}")
         print(f"  Successful:       {success_count}")
         print(f"  Failed / Paused:  {failed_count}")

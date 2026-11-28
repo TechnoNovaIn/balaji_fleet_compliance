@@ -173,16 +173,16 @@ POSTGRES_DB=balaji_fleet_db
 
 ---
 
-## 7. Running Automated Tests
+## 6. Running Automated Tests
 
-Run the complete Pytest suite (23 tests):
+Run the complete Pytest suite:
 ```powershell
 python -m pytest -v
 ```
 
 ---
 
-## 8. Render Deployment Notes
+## 7. Render Deployment Notes
 
 To deploy on Render:
 1. Create a **PostgreSQL** instance on Render and copy the Internal Database URL.
